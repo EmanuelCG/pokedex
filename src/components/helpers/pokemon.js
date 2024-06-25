@@ -1,8 +1,25 @@
-const formatStats = (stats) => {
-    const newStats = stats.map(({ stat, base_stat }) => ({ name: stat.name, base_stat, }))
-    console.log(newStats)
-    newStats.push({ name: "total", base_stat: newStats.reduce((acc, stat) => stat.base_stat + acc, 0) })
+import { getEvolutionsData } from "../../services/pokemonServices"
 
+const formatStats = (stats) => {
+    const nameTypes = {
+        hp: "HP",
+        attack: "ATK",
+        defense: "DEF",
+        "special-attack": "SpA",
+        "special-defense": "SpD",
+        speed: "SPD"
+    }
+
+    const newStats = stats.map(({ stat, base_stat }) => ({
+        name: nameTypes[stat.name],
+        base_stat,
+    }))
+
+    newStats.push({
+        name: "TOT",
+        base_stat: newStats.reduce((acc, stat) => stat.base_stat + acc, 0)
+    })
+    return newStats
 }
 
 const formatTypes = (types) => {
@@ -11,8 +28,10 @@ const formatTypes = (types) => {
 }
 
 const formatAbilities = (abilities) => abilities.map((ability) => ability.ability.name);
+
 const getPokemonDescription = (pokemonSpecie) => pokemonSpecie.flavor_text_entries[1].flavor_text;
-const getEvolutions = (evolutionInfo) => {
+
+const getEvolutions = async (evolutionInfo) => {
     const evolutions = []
     let evolutionData = evolutionInfo.chain
 
@@ -26,7 +45,26 @@ const getEvolutions = (evolutionInfo) => {
         evolutionData = evolutionData.evolves_to[0]
     } while (evolutionData)
 
+    const promises = getEvolutionsData(evolutions)
+    try {
+        const responses = await Promise.allSettled(promises)
+        assignInfoEvolutions(responses, evolutions)
+    } catch (error) {
+        console.log(error)
+    }
     return evolutions
 };
 
-export { formatStats, formatTypes, formatAbilities, getPokemonDescription, getEvolutions }
+const assignInfoEvolutions = (responses, evolutions) => {
+    responses.forEach((response, index) => {
+        if (response.status === "fulfilled") {
+            evolutions[index].image = response.value.data.sprites.versions["generation-v"]["black-white"].front_default;
+            evolutions[index].pokemonInfo = response.value.data;
+        }
+    });
+}
+
+const getImageByPokemon = (sprites) => {
+    return sprites.versions['generation-v']['black-white'].animated.front_default ?? sprites.versions['generation-v']['black-white'].front_default;
+}
+export { formatStats, formatTypes, formatAbilities, getPokemonDescription, getEvolutions, getImageByPokemon }
